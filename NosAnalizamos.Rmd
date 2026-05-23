@@ -88,3 +88,98 @@ head(notas2026)
 
 ```
 
+
+## Tabla de estadísticos
+
+```{r estadisticos}
+
+tabla_stats <- function(notas, anyo) {
+  notas %>%
+    select(all_of(asignaturas)) %>%
+    pivot_longer(everything(), names_to = "Asignatura", values_to = "Nota") %>%
+    group_by(Asignatura) %>%
+    summarise(
+      Min     = round(min(Nota,                 na.rm = TRUE), 2),
+      P25     = round(quantile(Nota, 0.25,      na.rm = TRUE), 2),
+      Mediana = round(median(Nota,              na.rm = TRUE), 2),
+      Media   = round(mean(Nota,                na.rm = TRUE), 2),
+      SD      = round(sd(Nota,                  na.rm = TRUE), 2),
+      P75     = round(quantile(Nota, 0.75,      na.rm = TRUE), 2),
+      Max     = round(max(Nota,                 na.rm = TRUE), 2),
+      .groups = "drop"
+    ) %>%
+    kable(caption = paste("Estadísticos curso", anyo))
+}
+
+tabla_stats(notas2022, "2022")
+tabla_stats(notas2026, "2026")
+
+```
+
+
+## ggpairs
+
+```{r ggpairs}
+
+notas2022 %>%
+  select(all_of(asignaturas)) %>%
+  ggpairs(title = "Relaciones entre calificaciones - 2022") +
+  theme_minimal()
+
+notas2026 %>%
+  select(all_of(asignaturas)) %>%
+  ggpairs(title = "Relaciones entre calificaciones - 2026") +
+  theme_minimal()
+
+```
+
+
+## Matrices de correlación y covarianza
+
+```{r correlacion}
+
+matrices_cor <- function(notas, anyo) {
+  notas_num    <- notas %>% select(all_of(asignaturas)) %>% drop_na()
+  cor_pearson  <- cor(notas_num, method = "pearson")
+  cor_spearman <- cor(notas_num, method = "spearman")
+  cov_mat      <- cov(notas_num)
+
+  cat("===", anyo, "- Correlación Pearson ===\n");  print(round(cor_pearson,  2))
+  cat("===", anyo, "- Correlación Spearman ===\n"); print(round(cor_spearman, 2))
+  cat("===", anyo, "- Covarianza ===\n");            print(round(cov_mat,      2))
+
+  # Par con mayor correlación (fuera de la diagonal)
+  cor_aux <- cor_pearson
+  diag(cor_aux) <- NA
+  idx <- which(abs(cor_aux) == max(abs(cor_aux), na.rm = TRUE), arr.ind = TRUE)
+  cat("Par con mayor correlación Pearson:", rownames(idx)[1], "y",
+      colnames(cor_pearson)[idx[1, 2]], "=",
+      round(cor_pearson[idx[1,1], idx[1,2]], 3), "\n\n")
+}
+
+matrices_cor(notas2022, "2022")
+matrices_cor(notas2026, "2026")
+
+```
+
+
+## Boxplots de todas las asignaturas
+
+```{r boxplots}
+
+boxplot_notas <- function(notas, anyo) {
+  notas %>%
+    pivot_longer(all_of(asignaturas), names_to = "Asignatura", values_to = "Nota") %>%
+    ggplot(aes(x = Asignatura, y = Nota, fill = Asignatura)) +
+    geom_boxplot() +
+    labs(title = paste("Distribución de calificaciones -", anyo)) +
+    theme_minimal() +
+    theme(legend.position = "none")
+}
+
+boxplot_notas(notas2022, "2022")
+boxplot_notas(notas2026, "2026")
+
+```
+
+
