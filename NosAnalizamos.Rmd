@@ -1,0 +1,90 @@
+---
+title: "NosAnalizamos"
+author: "Marina Moros Sebastià"
+date:  "`r Sys.Date()`"  
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+    number_sections: no
+  html_document:
+    echo: yes
+    number_sections: no
+    theme: lumen
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
+pacman::p_load(tidyverse, GGally, lubridate, knitr, kableExtra)
+```
+
+
+## Carga y limpieza automática de ambos ficheros
+
+```{r carga-ambos-anios}
+
+leer_datos <- function(ruta) {
+  lineas <- readLines(ruta, n = 50, warn = FALSE)
+  # Buscar la fila que contiene "Id" y "Age" y "Sex" (en cualquier posición)
+  fila_cabecera <- which(
+    str_detect(lineas, "\\bId\\b") &
+    str_detect(lineas, "\\bAge\\b") &
+    str_detect(lineas, "\\bSex\\b")
+  )[1]
+  if (is.na(fila_cabecera)) stop("No se encontró cabecera en ", ruta)
+  
+  read_tsv(ruta,
+           skip = fila_cabecera - 1,
+           col_names = TRUE,
+           show_col_types = FALSE,
+           locale = locale(encoding = "UTF-8")) %>%
+    filter(!is.na(Id) & Id != "" & Id != "Id")
+}
+
+datos2022 <- leer_datos("data/NosAutoanalizamos2022 - Hoja1.tsv")
+datos2026 <- leer_datos("data/NosAutoanalizamos2026 - NosAutoanalizamos (1).tsv")
+
+datos2022 <- datos2022 %>% filter(Id != "martsobm")
+datos2026 <- datos2026 %>% filter(Id != "martsobm")
+
+cat("Alumnos 2022:", nrow(datos2022), "\n")  
+cat("Alumnos 2026:", nrow(datos2026), "\n")  
+
+```
+
+
+## Limpieza de calificaciones
+
+```{r limpieza-notas}
+
+asignaturas <- c("ALG", "ANM", "FP", "DCS", "MD")
+
+limpia_nota <- function(x) {
+  x <- as.character(x)
+  x <- str_replace_all(x, ",", ".")          
+  x <- if_else(toupper(x) == "NC", "3", x)  
+  suppressWarnings(as.numeric(x))            
+}
+
+procesar_notas <- function(datos, anyo) {
+  notas <- datos %>%
+    select(Id, all_of(asignaturas)) %>%
+    mutate(across(all_of(asignaturas), limpia_nota))
+
+  if (anyo == "2022") save(notas, file = "Notas.Rdata")
+  return(notas)
+}
+
+notas2022 <- procesar_notas(datos2022, "2022")
+notas2026 <- procesar_notas(datos2026, "2026")
+
+cat("Notas 2022 - primeras filas:\n")
+head(notas2022)
+cat("\nNotas 2026 - primeras filas:\n")
+head(notas2026)
+
+```
+
