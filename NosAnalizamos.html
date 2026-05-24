@@ -971,13 +971,13 @@ print(tabla_mano)</code></pre>
 ##     Derecha Izquierda
 ##   F      22         2
 ##   M      29         7</code></pre>
-<pre class="r"><code>chi2 &lt;- chisq.test(tabla_mano)
+<pre class="r"><code>chi2 &lt;- chisq.test(tabla_mano, correct = FALSE)
 print(chi2)</code></pre>
 <pre><code>## 
-##  Pearson&#39;s Chi-squared test with Yates&#39; continuity correction
+##  Pearson&#39;s Chi-squared test
 ## 
 ## data:  tabla_mano
-## X-squared = 0.65904, df = 1, p-value = 0.4169</code></pre>
+## X-squared = 1.3943, df = 1, p-value = 0.2377</code></pre>
 <pre class="r"><code>if (chi2$p.value &lt; 0.05) {
   cat(&quot;Existe relación significativa entre sexo y mano de escritura.\n&quot;)
 } else {
@@ -989,33 +989,24 @@ print(chi2)</code></pre>
 <h3>6. Existe una relación lineal entre la altura (Height) y la
 distancia del extremo del meñique al extremo del pulgar de la mano con
 la que escribimos (Wr.Hnd)</h3>
-<pre class="r"><code>test &lt;- cor.test(datos26$Height, datos26$Wr.Hnd, method = &quot;pearson&quot;, use = &quot;complete.obs&quot;)
-cat(&quot;Coeficiente de correlación de Pearson: r =&quot;, round(test$estimate, 3), &quot;\n&quot;)</code></pre>
-<pre><code>## Coeficiente de correlación de Pearson: r = 0.431</code></pre>
-<pre class="r"><code>cat(&quot;p-valor =&quot;, round(test$p.value, 4), &quot;\n&quot;)</code></pre>
-<pre><code>## p-valor = 8e-04</code></pre>
-<pre class="r"><code>if (test$p.value &lt; 0.05) {
-  cat(&quot;Existe una relación lineal significativa.\n&quot;)
-} else {
-  cat(&quot;No hay evidencia de relación lineal significativa.\n&quot;)
-}</code></pre>
-<pre><code>## Existe una relación lineal significativa.</code></pre>
+<pre class="r"><code>cor(datos26$Height, datos26$Wr.Hnd, method = &quot;pearson&quot;, use = &quot;complete.obs&quot;)</code></pre>
+<pre><code>## [1] 0.4310869</code></pre>
 </div>
 <div id="el-identificador-de-hampel-detecta-algún-outlier-en-la-variable-altura." class="section level3">
 <h3>7. El identificador de Hampel detecta algún outlier en la variable
 altura.</h3>
-<pre class="r"><code>med_h  &lt;- median(datos26$Height, na.rm = TRUE)
-mad_h  &lt;- mad(datos26$Height,    na.rm = TRUE)
-limite &lt;- 3 * mad_h
+<pre class="r"><code>x      &lt;- datos26$Height
+med_h  &lt;- median(x, na.rm = TRUE)
+mad_h  &lt;- mad(x,    na.rm = TRUE)   # incluye factor 1.4826
+upLim  &lt;- med_h + 3 * mad_h
+lowLim &lt;- med_h - 3 * mad_h
 
-cat(&quot;Mediana de Height:&quot;, med_h, &quot;\n&quot;)</code></pre>
-<pre><code>## Mediana de Height: 173.5</code></pre>
-<pre class="r"><code>cat(&quot;MAD de Height:&quot;, round(mad_h, 3), &quot;\n&quot;)</code></pre>
-<pre><code>## MAD de Height: 10.378</code></pre>
-<pre class="r"><code>cat(&quot;Umbral Hampel (+-3·MAD):&quot;, round(limite, 3), &quot;\n\n&quot;)</code></pre>
-<pre><code>## Umbral Hampel (+-3·MAD): 31.135</code></pre>
+cat(&quot;Mediana:&quot;, med_h, &quot;| MAD:&quot;, round(mad_h, 3), &quot;\n&quot;)</code></pre>
+<pre><code>## Mediana: 173.5 | MAD: 10.378</code></pre>
+<pre class="r"><code>cat(&quot;Intervalo valores normales: [&quot;, round(lowLim, 3), &quot;,&quot;, round(upLim, 3), &quot;]\n\n&quot;)</code></pre>
+<pre><code>## Intervalo valores normales: [ 142.365 , 204.635 ]</code></pre>
 <pre class="r"><code>outliers_h &lt;- datos26 %&gt;%
-  filter(!is.na(Height) &amp; abs(Height - med_h) &gt; limite)
+  filter(!is.na(Height) &amp; (Height &lt; lowLim | Height &gt; upLim))
 
 cat(&quot;Número de outliers detectados:&quot;, nrow(outliers_h), &quot;\n&quot;)</code></pre>
 <pre><code>## Número de outliers detectados: 0</code></pre>
