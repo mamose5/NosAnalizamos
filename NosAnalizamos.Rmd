@@ -183,3 +183,173 @@ boxplot_notas(notas2026, "2026")
 ```
 
 
+## Boxplot coloreado por sexo
+
+```{r boxplot-sexo}
+
+# Limpieza de sexo (válida para ambos años)
+limpiar_sexo <- function(datos) {
+  datos %>%
+    mutate(Sex_clean = case_when(
+      str_to_upper(str_trim(Sex)) %in% c("M", "MASCULINO", "HOMBRE") ~ "M",
+      str_to_upper(str_trim(Sex)) %in% c("F", "FEMENINO",  "MUJER")  ~ "F",
+      TRUE ~ NA_character_
+    ))
+}
+
+boxplot_sexo <- function(notas, datos, anyo) {
+  datos_sexo <- limpiar_sexo(datos) %>% select(Id, Sex_clean)
+  notas %>%
+    left_join(datos_sexo, by = "Id") %>%
+    filter(!is.na(Sex_clean)) %>%
+    pivot_longer(all_of(asignaturas), names_to = "Asignatura", values_to = "Nota") %>%
+    ggplot(aes(x = Asignatura, y = Nota, fill = Sex_clean)) +
+    geom_boxplot() +
+    labs(title = paste("Calificaciones por asignatura y sexo -", anyo), fill = "Sexo") +
+    theme_minimal()
+}
+
+boxplot_sexo(notas2022, datos2022, "2022")
+boxplot_sexo(notas2026, datos2026, "2026")
+
+```
+
+
+## Gráfico de líneas: alumnos con todas las notas
+
+```{r lineas-completos}
+
+grafico_lineas <- function(notas, anyo) {
+  completos <- notas %>%
+    filter(if_all(all_of(asignaturas), ~ !is.na(.)))
+  
+  if (nrow(completos) == 0) {
+    cat("No hay alumnos con todas las notas en", anyo, "\n")
+    return(invisible(NULL))
+  }
+  
+  completos %>%
+    pivot_longer(all_of(asignaturas), names_to = "Asignatura", values_to = "Nota") %>%
+    ggplot(aes(x = Id, y = Nota, color = Asignatura, group = Asignatura)) +
+    geom_line() +
+    geom_point() +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+    labs(title = paste("Perfil de calificaciones completas -", anyo),
+         x = "Usuario", y = "Nota")
+}
+
+grafico_lineas(notas2022, "2022")
+grafico_lineas(notas2026, "2026")
+
+```
+
+```{r comparacion-simple}
+cat("Comparación 2022 vs 2026: la nota media global fue", 
+    round(mean(unlist(notas2022[,asignaturas]), na.rm=TRUE), 2), 
+    "en 2022 y", 
+    round(mean(unlist(notas2026[,asignaturas]), na.rm=TRUE), 2), 
+    "en 2026.\n")
+```
+
+
+## Preguntas específicas del curso 2026
+
+```{r limpieza-2026}
+
+# Limpiamos todas las variables problemáticas detectadas en los datos reales: 
+datos26 <- datos2026 %>%
+  mutate(
+    FechaNac = dmy(`FechaNac(DD-MM-YYY)`),
+
+    Smoke = case_when(
+      str_to_upper(str_trim(Smoke)) %in% c("SI", "SÍ", "YES") ~ "Si",
+      str_to_upper(str_trim(Smoke)) %in% c("NO")              ~ "No",
+      TRUE ~ NA_character_
+    ),
+
+    NW.Hnd = case_when(
+      str_to_title(str_trim(NW.Hnd)) == "Derecha"   ~ "Derecha",
+      str_to_title(str_trim(NW.Hnd)) == "Izquierda" ~ "Izquierda",
+      TRUE ~ NA_character_
+    ),
+
+    Sex = case_when(
+      str_to_upper(str_trim(Sex)) %in% c("M", "MASCULINO") ~ "M",
+      str_to_upper(str_trim(Sex)) %in% c("F", "FEMENINO")  ~ "F",
+      TRUE ~ NA_character_
+    ),
+
+    # Numéricas con coma decimal
+    Wr.Hnd = as.numeric(str_replace_all(as.character(Wr.Hnd), ",", ".")),
+    Hwork  = as.numeric(str_replace_all(as.character(Hwork),  ",", ".")),
+    Pulse  = as.numeric(Pulse),
+    Height = as.numeric(Height)
+  )
+
+```
+
+
+## Preguntas:
+
+### 1. ¿Qué edad, expresada en años (con decimales) tiene el alumno más joven a fecha 01/02/2026.
+
+```{r p1-alumno-mas-joven}
+
+fecha_ref <- ymd("2026-02-01")
+
+datos26 <- datos26 %>%
+  mutate(Edad = as.numeric(difftime(fecha_ref, FechaNac, units = "days")) / 365.25)
+
+joven <- datos26 %>% slice_min(Edad, n = 1)
+
+cat("Alumno más joven:", joven$Id, "\n")
+cat("Edad a 01/02/2026:", round(joven$Edad, 4), "años\n")
+
+```
+
+### 2. Cuántos alumnos simultanean trabajo y estudios.
+
+```{r p2-trabajo-y-estudios}
+
+trabajadores <- datos26 %>% filter(!is.na(Hwork) & Hwork > 0)
+
+cat("Alumnos que simultanean trabajo y estudios:", nrow(trabajadores), "\n")
+print(trabajadores %>% select(Id, Hwork))
+
+```
+
+### 3. Hay más hombres o más mujeres fumadoras.
+
+```{r p3-fumadores-por-sexo}
+
+tabla_fum <- table(datos26$Sex, datos26$Smoke, useNA = "ifany")
+print(tabla_fum)
+
+hom_fum <- tabla_fum["M", "Si"]
+muj_fum <- tabla_fum["F", "Si"]
+
+if (hom_fum > muj_fum) {
+  cat("Hay más hombres fumadores (", hom_fum, "H vs", muj_fum, "M)\n")
+} else if (muj_fum > hom_fum) {
+  cat("Hay más mujeres fumadoras (", muj_fum, "M vs", hom_fum, "H)\n")
+} else {
+  cat("Mismo número de hombres y mujeres fumadores (", hom_fum, "cada uno)\n")
+}
+
+```
+
+### 4. Cuál es el valor medio y la varianza de la variable Wr.Hnd según el sexo.
+
+```{r p4-wrhnd-por-sexo}
+
+datos26 %>%
+  group_by(Sex) %>%
+  summarise(
+    Media    = round(mean(Wr.Hnd, na.rm = TRUE), 2),
+    Varianza = round(var(Wr.Hnd,  na.rm = TRUE), 2),
+    .groups  = "drop"
+  ) %>%
+  kable(caption = "Media y varianza de Wr.Hnd según sexo")
+
+```
