@@ -244,7 +244,7 @@ grafico_lineas(notas2026, "2026")
 
 ```
 
-```{r comparacion-simple}
+```{r comparacion}
 cat("Comparación 2022 vs 2026: la nota media global fue", 
     round(mean(unlist(notas2022[,asignaturas]), na.rm=TRUE), 2), 
     "en 2022 y", 
@@ -361,7 +361,7 @@ datos26 %>%
 tabla_mano <- table(datos26$Sex, datos26$NW.Hnd)
 print(tabla_mano)
 
-chi2 <- chisq.test(tabla_mano)
+chi2 <- chisq.test(tabla_mano, correct = FALSE)
 print(chi2)
 
 if (chi2$p.value < 0.05) {
@@ -376,15 +376,7 @@ if (chi2$p.value < 0.05) {
 
 ```{r p6-height-vs-wrhnd}
 
-test <- cor.test(datos26$Height, datos26$Wr.Hnd, method = "pearson", use = "complete.obs")
-cat("Coeficiente de correlación de Pearson: r =", round(test$estimate, 3), "\n")
-cat("p-valor =", round(test$p.value, 4), "\n")
-
-if (test$p.value < 0.05) {
-  cat("Existe una relación lineal significativa.\n")
-} else {
-  cat("No hay evidencia de relación lineal significativa.\n")
-}
+cor(datos26$Height, datos26$Wr.Hnd, method = "pearson", use = "complete.obs")
 
 ```
 
@@ -392,16 +384,17 @@ if (test$p.value < 0.05) {
 
 ```{r p7-outliers-hampel-height}
 
-med_h  <- median(datos26$Height, na.rm = TRUE)
-mad_h  <- mad(datos26$Height,    na.rm = TRUE)
-limite <- 3 * mad_h
+x      <- datos26$Height
+med_h  <- median(x, na.rm = TRUE)
+mad_h  <- mad(x,    na.rm = TRUE)   # incluye factor 1.4826
+upLim  <- med_h + 3 * mad_h
+lowLim <- med_h - 3 * mad_h
 
-cat("Mediana de Height:", med_h, "\n")
-cat("MAD de Height:", round(mad_h, 3), "\n")
-cat("Umbral Hampel (+-3·MAD):", round(limite, 3), "\n\n")
+cat("Mediana:", med_h, "| MAD:", round(mad_h, 3), "\n")
+cat("Intervalo valores normales: [", round(lowLim, 3), ",", round(upLim, 3), "]\n\n")
 
 outliers_h <- datos26 %>%
-  filter(!is.na(Height) & abs(Height - med_h) > limite)
+  filter(!is.na(Height) & (Height < lowLim | Height > upLim))
 
 cat("Número de outliers detectados:", nrow(outliers_h), "\n")
 if (nrow(outliers_h) > 0) {
