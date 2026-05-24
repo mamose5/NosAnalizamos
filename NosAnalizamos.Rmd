@@ -353,3 +353,141 @@ datos26 %>%
   kable(caption = "Media y varianza de Wr.Hnd según sexo")
 
 ```
+
+### 5. Determina si existe relación entre el sexo y la mano con la que se escribe  (NW.Hnd)
+
+```{r p5-sexo-vs-nwhnd}
+
+tabla_mano <- table(datos26$Sex, datos26$NW.Hnd)
+print(tabla_mano)
+
+chi2 <- chisq.test(tabla_mano)
+print(chi2)
+
+if (chi2$p.value < 0.05) {
+  cat("Existe relación significativa entre sexo y mano de escritura.\n")
+} else {
+  cat("No hay evidencia de relación entre sexo y mano de escritura\n")
+}
+
+```
+
+### 6. Existe una relación lineal entre la altura (Height) y la distancia del extremo del meñique al extremo del pulgar de la mano con la que escribimos (Wr.Hnd)
+
+```{r p6-height-vs-wrhnd}
+
+test <- cor.test(datos26$Height, datos26$Wr.Hnd, method = "pearson", use = "complete.obs")
+cat("Coeficiente de correlación de Pearson: r =", round(test$estimate, 3), "\n")
+cat("p-valor =", round(test$p.value, 4), "\n")
+
+if (test$p.value < 0.05) {
+  cat("Existe una relación lineal significativa.\n")
+} else {
+  cat("No hay evidencia de relación lineal significativa.\n")
+}
+
+```
+
+### 7. El identificador de Hampel detecta algún outlier en la variable altura.
+
+```{r p7-outliers-hampel-height}
+
+med_h  <- median(datos26$Height, na.rm = TRUE)
+mad_h  <- mad(datos26$Height,    na.rm = TRUE)
+limite <- 3 * mad_h
+
+cat("Mediana de Height:", med_h, "\n")
+cat("MAD de Height:", round(mad_h, 3), "\n")
+cat("Umbral Hampel (+-3·MAD):", round(limite, 3), "\n\n")
+
+outliers_h <- datos26 %>%
+  filter(!is.na(Height) & abs(Height - med_h) > limite)
+
+cat("Número de outliers detectados:", nrow(outliers_h), "\n")
+if (nrow(outliers_h) > 0) {
+  print(outliers_h %>% select(Id, Height))
+} else {
+  cat("El identificador de Hampel no detecta ningún outlier en Height.\n")
+}
+
+```
+
+### 8. Considera la asignatura FP. Si queremos realizar una imputación generalizada usando la media, ¿qué valor deberíamos utilizar ?
+
+```{r p8-imputacion-media-fp}
+
+media_FP <- mean(notas2026$FP, na.rm = TRUE)
+
+cat("Valor para imputación generalizada de FP (media):", round(media_FP, 2), "\n")
+cat("Número de valores NA en FP:", sum(is.na(notas2026$FP)), "\n")
+
+```
+
+### 9. Define una nueva variable (PulseCat) a partir del ritmo cardíaco (Pulse), con dos valores PulseH, si Pulse>=65 y PulseL si Pulse<65. ¿Qué valores utilizarías para imputar los valores faltantes de las notas de FP, dependiendo del valor de PulseCat (imputación por casos similares)
+
+```{r p9-pulsecat-imputacion-similar}
+
+datos26 <- datos26 %>%
+  mutate(PulseCat = if_else(Pulse >= 65, "PulseH", "PulseL", missing = NA_character_))
+
+# Calculamos medias de FP por categoría (solo las que tienen datos)
+medias_FP_cat <- notas2026 %>%
+  inner_join(datos26 %>% select(Id, PulseCat), by = "Id") %>%
+  group_by(PulseCat) %>%
+  summarise(Media_FP = mean(FP, na.rm = TRUE), .groups = "drop")
+
+print(medias_FP_cat)
+
+# Extraemos valores para imputación (sin NA)
+media_H <- medias_FP_cat %>% filter(PulseCat == "PulseH") %>% pull(Media_FP)
+media_L <- medias_FP_cat %>% filter(PulseCat == "PulseL") %>% pull(Media_FP)
+
+cat("Para imputar FP por casos similares:\n")
+cat("  Alumnos con PulseH: usar", round(media_H, 2), "\n")
+cat("  Alumnos con PulseL: usar", round(media_L, 2), "\n")
+
+```
+
+### 10. ¿Qué podemos decir, como científicos de datos, ante esta frase referida a nuestros datos ? "El ritmo cardíaco está ligado con la cantidad de sangre que llega al cerebro, por tanto existirá una relación lineal directa esta esta variable y las calificaciones obtenidas en ALG"
+
+```{r p10-pulse-vs-alg}
+
+datos_pa <- notas2026 %>%
+  inner_join(datos26 %>% select(Id, Pulse), by = "Id") %>%
+  filter(!is.na(Pulse) & !is.na(ALG))
+
+cor10 <- cor.test(datos_pa$Pulse, datos_pa$ALG, method = "pearson")
+print(cor10)
+
+modelo10 <- lm(ALG ~ Pulse, data = datos_pa)
+print(summary(modelo10))
+
+ggplot(datos_pa, aes(x = Pulse, y = ALG)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = TRUE, color = "steelblue") +
+  labs(title = "Ritmo cardíaco vs Nota en ALG (2026)",
+       x = "Pulso (lat/min)", y = "Nota ALG") +
+  theme_minimal()
+
+cat("\nComo científico de datos, podemos decir que la frase asume causalidad 
+    directa desde un argumento fisiológico simplista.\n")
+cat("Los datos muestran:\n")
+cat("  - Correlación r =", round(cor10$estimate, 3), "\n")
+cat("  - p-valor        =", round(cor10$p.value,  4), "\n")
+cat("  - R^2             =", round(summary(modelo10)$r.squared, 4), "\n\n")
+
+cat("Por tanto:\n")
+if (cor10$p.value > 0.05) {
+  cat("- No existe evidencia estadística de relación lineal (p >0.05). La hipótesis 
+  queda rechazada con nuestros datos.\n")
+} else {
+  cat("- Existe correlación significativa, pero correlación NO implica causalidad.\n")
+}
+cat("\nEl rendimiento académico es multifactorial (horas de estudio, asistencia, 
+    motivación, dificultad percibida...), concluir entonces, que el pulso determina 
+    la nota en ALG es una falacia. Un R^2 cercano a 0 confirma que el pulso no 
+    explica prácticamente nada de la variabilidad en las calificaciones.\n")
+
+```
+
+
